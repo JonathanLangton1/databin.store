@@ -1,0 +1,112 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["jsonProtocol"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model access_tokens {
+  id           Int      @id @default(autoincrement())
+  user_id      Int
+  access_token Int
+  expires_on   DateTime @db.Timestamp(0)
+  created_at   DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([user_id], map: "user_index")
+}
+
+model client_access_keys {
+  id              Int      @id @default(autoincrement())
+  user_id         Int
+  access_key      String   @db.VarChar(20)
+  access_key_hash String   @db.VarChar(40)
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([user_id], map: "user_index")
+}
+
+model invoices {
+  guid                String          @id @db.Char(36)
+  subscription_id     Int
+  issue_date          DateTime        @db.DateTime(0)
+  due_date            DateTime        @db.DateTime(0)
+  total_amount_due    Decimal         @default(0.00) @db.Decimal(10, 2)
+  amount_paid         Decimal         @default(0.00) @db.Decimal(10, 2)
+  xch_payment_address String          @db.VarChar(62)
+  status              invoices_status
+}
+
+model payments {
+  id                  Int     @id @default(autoincrement())
+  invoice_guid        String  @db.Char(36)
+  coin_name           String  @unique(map: "coin_name") @db.VarChar(66)
+  amount              Decimal @db.Decimal(10, 2)
+  confirmed_at_height String  @db.VarChar(100)
+  fee                 String  @db.VarChar(300)
+
+  @@unique([invoice_guid, coin_name, confirmed_at_height], map: "unique_payment")
+}
+
+model subscriptions {
+  id          Int                  @id @default(autoincrement())
+  user_id     Int
+  product_key String               @db.VarChar(25)
+  start_date  DateTime             @db.DateTime(0)
+  end_date    DateTime             @db.DateTime(0)
+  status      subscriptions_status
+  data        Json?
+}
+
+model user_meta {
+  id         Int    @id @default(autoincrement())
+  user_id    Int
+  meta_key   String @db.VarChar(100)
+  meta_value String @db.VarChar(100)
+
+  @@unique([user_id, meta_key], map: "unique_user_meta_index")
+  @@index([user_id], map: "user_index")
+}
+
+model user_mirrors {
+  id               Int      @id @default(autoincrement())
+  user_id          Int
+  singleton_id     String   @db.VarChar(100)
+  name             String?  @db.VarChar(100)
+  active           Boolean? @default(false)
+  subscription_id  Int?
+  salt             String?  @db.VarChar(100)
+  permissioned_for Json?
+
+  @@unique([user_id, singleton_id], map: "unique_user_singleton_id_index")
+  @@index([user_id, active], map: "active_index")
+  @@index([user_id], map: "user_index")
+}
+
+model users {
+  id            Int      @id @default(autoincrement())
+  username      String   @unique(map: "username") @db.VarChar(100)
+  email         String   @unique(map: "email") @db.VarChar(100)
+  password_hash String   @db.VarChar(600)
+  confirmed     Boolean  @default(false)
+  created_at    DateTime @default(now()) @db.Timestamp(0)
+  updated_at    DateTime @default(now()) @db.Timestamp(0)
+}
+
+enum subscriptions_status {
+  pending
+  active
+  expired
+  grace_period
+  cancelled
+  terminated
+}
+
+enum invoices_status {
+  unpaid
+  paid
+  overdue
+  expired
+}
